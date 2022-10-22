@@ -1,4 +1,5 @@
-// Practica tema 5, Rebe© Matin Jorge
+// Practica tema 5, Rebe Martin Jorge
+
 
 #include <errno.h>
 #include<stdio.h>
@@ -30,8 +31,8 @@ int main(int argc, char* argv[]){
    char* ip;
 
    /*
-    * 	Comprobacio√n de que la llamada al programa se ha realizado de manera correcta,
-    * 	comprobando el nu√mero de argumentos utilizados
+    * 	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
+    * 	comprobando el numero de argumentos utilizados
     */
 
    if(argc < 2 || argc == 3 || argc > 4){
@@ -41,7 +42,7 @@ int main(int argc, char* argv[]){
 
 
    /**
-    *	Comprobacio√n de que la llamada al programa se ha realizado de manera correcta,
+    *	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
     *	comprobando que las opciones utilizadas son correctas (so√lo opio√n -p)
     *
     *	Si se utiliza alguna otra, se muestra el error y se sale.

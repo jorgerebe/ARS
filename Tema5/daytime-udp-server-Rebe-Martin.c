@@ -1,4 +1,5 @@
-// Practica tema 5, Reb√© Mar√n Jorge
+// Practica tema 5, Rebe Martin Jorge
+
 
 #include <errno.h>
 #include <stdio.h>
@@ -45,7 +46,7 @@ int main(int argc, char* argv[]){
    int puerto_tmp = -1;
    uint16_t puerto;
 
-   /*   Comprobacio√n de que la llamada al programase ha realizado de manera correct,
+   /*   Comprobacio√n de que la llamada al program ase ha realizado de manera correct,
     *   comprobando el numero de argumentos utilizados
     */
 
@@ -55,7 +56,7 @@ int main(int argc, char* argv[]){
 
    /*  
     *  Si se ha utilizado la opcio√n -p, se recoge su valor.
-    *  Si se ha utilizado una opcio√n no v√lida, se reporta el error
+    *  Si se ha utilizado una opcio√n no a√lida, se reporta el erro
     */
 
    while((opt = getopt(argc, argv, "p:")) != -1){
@@ -140,7 +141,7 @@ int main(int argc, char* argv[]){
 
       /*
        * Se reserva espacio para un buffer en el que
-       * se mandar√° la respuesta al cliente
+       * se mandara la respuesta al cliente
        *
        */
       
@@ -157,7 +158,7 @@ int main(int argc, char* argv[]){
       nread = recvfrom(sockfd, in_datagram, BUF_SIZE, 0, (struct sockaddr*)&addr_sender, &sizeAddress);
 
       /*
-       *   Si hay una peticio√n fallida, se ignor
+       *   Si hay una peticio√n fallida, se ignoa
        */
 
       if(nread == -1){

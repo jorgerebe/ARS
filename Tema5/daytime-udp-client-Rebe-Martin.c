@@ -14,7 +14,7 @@
 
 #include <netdb.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define BUF_SIZE 50 
 
@@ -135,7 +135,7 @@ int main(int argc, char* argv[]){
 
       if(info_servidor == NULL){
 #if DEBUG
-         printf("Servidor no encontrado\n");
+         printf("Servicio no encontrado\n");
 #endif
          exit(EXIT_FAILURE);
       }
@@ -145,7 +145,6 @@ int main(int argc, char* argv[]){
 
 #if DEBUG
    printf("Puerto:%hu\n", be16toh(puerto));
-   printf("Server found\n");
    fflush(stdout);
 #endif
    

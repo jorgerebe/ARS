@@ -20,7 +20,9 @@
 #define BUF_SIZE 50
 
 #define NOMBRE_SERVICIO "daytime"
-FILE *fich;
+
+void salir(char*argv[]);
+
 
 int main(int argc, char* argv[]){
 
@@ -48,8 +50,7 @@ int main(int argc, char* argv[]){
     */
 
    if(argc == 2 || argc > 3){
-      fprintf(stderr, "Usage: %s [-p puerto-servidor]\n", argv[0]);
-      exit(EXIT_FAILURE);
+      salir(argv);
    }
 
    /*  
@@ -61,11 +62,13 @@ int main(int argc, char* argv[]){
       switch(opt){
          case 'p':
             puerto_tmp = atoi(optarg);
+            if(puerto_tmp < 0){
+               salir(argv);
+            }
             puerto = htons(puerto_tmp);
             break;
          default:
-            fprintf(stderr, "Usage: %s [-p puerto-servidor]\n", argv[0]);
-            exit(EXIT_FAILURE);
+           salir(argv);
       }
    }
 
@@ -80,7 +83,7 @@ int main(int argc, char* argv[]){
       info_servidor = getservbyname(NOMBRE_SERVICIO, NULL);
 
       if(info_servidor == NULL){
-         printf("Servidor no encontrado\n");
+         printf("Servicio no encontrado\n");
          exit(EXIT_FAILURE);
       }
 
@@ -121,7 +124,7 @@ int main(int argc, char* argv[]){
 
 
 #if DEBUG
-   printf("Puerto:%d\n", puerto);
+   printf("Puerto:%d\n", be16toh(puerto));
    fflush(stdout);
 #endif
 
@@ -134,8 +137,15 @@ int main(int argc, char* argv[]){
 
 /*Bucle de recibimiento de solicitudes*/
    for(;;){
+
+      /*
+       * Se reserva espacio para un buffer en el que
+       * se mandarÃ¡ la respuesta al cliente
+       *
+       */
       
       buf = (char *)malloc(BUF_SIZE*sizeof(char));
+      buf[0] = '\0';
 
       strcat(buf, hostname);
 
@@ -147,7 +157,7 @@ int main(int argc, char* argv[]){
       nread = recvfrom(sockfd, in_datagram, BUF_SIZE, 0, (struct sockaddr*)&addr_sender, &sizeAddress);
 
       /*
-       *   Si hay una peticioÃn fallida, se ignora
+       *   Si hay una peticioÃn fallida, se ignor
        */
 
       if(nread == -1){
@@ -155,10 +165,6 @@ int main(int argc, char* argv[]){
       }
 
 #if DEBUG
-      printf("FAMILY: %d\n",addr_sender.sin_family);
-      printf("PORT: %d\n", addr_sender.sin_port);
-      printf("ADDR: %d\n\n", addr_sender.sin_addr.s_addr);
-
       printf("El cliente dijo: %s\n", in_datagram);
 
       fflush(stdout);
@@ -170,7 +176,8 @@ int main(int argc, char* argv[]){
        *   a un fichero que se encontrara en la direccion /tmp/tt.txt,
        *   sobreescribiendolo si ya existiera.
        *
-       *   Despues, se escribe el resultado en el buffer buf
+       *   Despues, se escribe el resultado en el buffer buf despues
+       *   del nombre del host
        */
 
 
@@ -183,14 +190,16 @@ int main(int argc, char* argv[]){
 
       fclose(fich);
 
-     /*
-      *   Se concatenan la cadena que contiene el nombre del host con
-      *   la cadena que contiene la fecha y la hora
-      */ 
+     
 
 #if DEBUG
-      printf("%s\n",hostname);
+      printf("Mensaje enviado: %s\n",buf);
 #endif
+
+      /*
+       * Se envia la respuesta al cliente. Si hay error en el envio, se reporta
+       * y se termina el programa
+       */
 
       envio = sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr*)&addr_sender, sizeAddress);
       if(envio == -1){
@@ -198,7 +207,17 @@ int main(int argc, char* argv[]){
          exit(EXIT_FAILURE);
       }
 
+      /*
+       * Se libera el espacio ocupado por el buffer
+       * de la respuesta al cliente
+       */
+
       free(buf);
    }
 
+}
+
+void salir(char* argv[]){
+   fprintf(stderr, "Usage: %s [-p puerto-servidor]\n", argv[0]);
+   exit(EXIT_FAILURE);
 }

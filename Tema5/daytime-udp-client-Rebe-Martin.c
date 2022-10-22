@@ -43,7 +43,7 @@ int main(int argc, char* argv[]){
 
    /**
     *	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
-    *	comprobando que las opciones utilizadas son correctas (so√lo opio√n -p)
+    *	comprobando que las opciones utilizadas son correctas (solo opcion -p)
     *
     *	Si se utiliza alguna otra, se muestra el error y se sale.
     */
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]){
 
 
    /*
-    *	Generacio≥≥√n del descriptor del socket UDP
+    *	Generacion del descriptor del socket UDP
     */
 
    int sockfd;
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]){
    }
 
    /*
-    *	Enlace del socket a una direccio√n y a un puerto locales.
+    *	Enlace del socket a una direccion y a un puerto locales.
     *	El puerto se pone a 0 para que el sistema operativo lo decida
     */
 
@@ -99,13 +99,13 @@ int main(int argc, char* argv[]){
 #endif
 
    /**
-    *	Se busca la direccio√n IP y el n√mero de puerto de protocolo del servidor con el que se desea
-    *	realizar la comunicacio√n. S
+    *	Se busca la direccion IP y el numero de puerto de protocolo del servidor con el que se desea
+    *	realizar la comunicacion. S
     */
 
    /**
-    * 	En primer lugar, se obtiene la direccio√n ip del argumento al que apuna argv[optind] [getopt(3)]
-    * 	optind es el i√ndice en argv del primer elemento de ese vector que no es una opco√
+    * 	En primer lugar, se obtiene la direccion ip del argumento al que apunta argv[optind] [getopt(3)]
+    * 	optind es el indice en argv del primer elemento de ese vector que no es una opcion
     */
 
    ip = argv[optind];
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]){
    struct servent* info_servidor;
 
    /**
-    *	Convertimos la cadena que contiene la IP en un n√mero de 32 bits en network byte order, y
+    *	Convertimos la cadena que contiene la IP en un numero de 32 bits en network byte order, y
     *	lo guarda en una estructura in_addr
    **/
 
@@ -126,7 +126,7 @@ int main(int argc, char* argv[]){
 
    /*
     *	Si no se ha especificado puerto, se busca el correspondiente
-    *	al servicio que se va a utilizar, en este caso, daytime; utlizando
+    *	al servicio que se va a utilizar, en este caso, daytime; utilizando
     *	para ello getservbyname()
     */
 
@@ -150,7 +150,7 @@ int main(int argc, char* argv[]){
 #endif
    
    /*
-    *	Se asigna los datos de la direccio√n del servidor a los campos
+    *	Se asigna los datos de la direccion del servidor a los campos
     *	de la estructura sockaddr_in
     */
 
@@ -167,7 +167,7 @@ int main(int argc, char* argv[]){
 
 
    /**
-    *	Se envi√a un datagrama con una cadena arbitraria al puerto y servidor correspondiente
+    *	Se envia un datagrama con una cadena arbitraria al puerto y servidor correspondiente
     */
 
    int envio = sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
@@ -211,7 +211,7 @@ int main(int argc, char* argv[]){
   }
 
   /*
-   *	Finalizacio√n del cliente
+   *	Finalizacion del cliente
    */
 
    exit(EXIT_SUCCESS);

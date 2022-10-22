@@ -1,4 +1,4 @@
-// Practica tema 5, Reb√© Mar√n Jorge
+// Practica tema 5, Rebe© Matin Jorge
 
 #include <errno.h>
 #include<stdio.h>
@@ -42,7 +42,7 @@ int main(int argc, char* argv[]){
 
    /**
     *	Comprobacio√n de que la llamada al programa se ha realizado de manera correcta,
-    *	comprobando que las opciones utilizadas son correctas (s√lo opc√n -p)
+    *	comprobando que las opciones utilizadas son correctas (so√lo opio√n -p)
     *
     *	Si se utiliza alguna otra, se muestra el error y se sale.
     */
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]){
 
 
    /*
-    *	Generaci√≥≥√n del descriptor del socket UDP
+    *	Generacio≥≥√n del descriptor del socket UDP
     */
 
    int sockfd;
@@ -77,7 +77,7 @@ int main(int argc, char* argv[]){
    }
 
    /*
-    *	Enlace del socket a una direcci√n y a un puerto locales.
+    *	Enlace del socket a una direccio√n y a un puerto locales.
     *	El puerto se pone a 0 para que el sistema operativo lo decida
     */
 
@@ -98,13 +98,13 @@ int main(int argc, char* argv[]){
 #endif
 
    /**
-    *	Se busca la direcci√n IP y el n√mero de puerto de protocolo del servidor con el que se desea
-    *	realizar la comunicaci√n. S
+    *	Se busca la direccio√n IP y el n√mero de puerto de protocolo del servidor con el que se desea
+    *	realizar la comunicacio√n. S
     */
 
    /**
-    * 	En primer lugar, se obtiene la direcci√n ip del argumento al que apunt argv[optind] [getopt(3)]
-    * 	optind es el √ndice en argv del primer elemento de ese vector que no es una opci√n
+    * 	En primer lugar, se obtiene la direccio√n ip del argumento al que apuna argv[optind] [getopt(3)]
+    * 	optind es el i√ndice en argv del primer elemento de ese vector que no es una opco√
     */
 
    ip = argv[optind];
@@ -149,7 +149,7 @@ int main(int argc, char* argv[]){
 #endif
    
    /*
-    *	Se asigna los datos de la direcci√n del servidor a los campos
+    *	Se asigna los datos de la direccio√n del servidor a los campos
     *	de la estructura sockaddr_in
     */
 
@@ -166,7 +166,7 @@ int main(int argc, char* argv[]){
 
 
    /**
-    *	Se env√a un datagrama con una cadena arbitraria al puerto y servidor correspondiente
+    *	Se envi√a un datagrama con una cadena arbitraria al puerto y servidor correspondiente
     */
 
    int envio = sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
@@ -210,7 +210,7 @@ int main(int argc, char* argv[]){
   }
 
   /*
-   *	Finalizaci√n del cliente
+   *	Finalizacio√n del cliente
    */
 
    exit(EXIT_SUCCESS);

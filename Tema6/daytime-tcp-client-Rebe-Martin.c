@@ -17,7 +17,7 @@
 
 #define DEBUG 0
 
-#define BUF_SIZE 100 
+#define BUF_SIZE 50 
 
 #define NOMBRE_SERVICIO "daytime"
 
@@ -200,7 +200,8 @@ int main(int argc, char* argv[]){
    /*
     *	Cierre del socket UDP
     */
-
+   shutdown(sockfd, SHUT_RDWR);
+   
   int cierre = close(sockfd);
 
   if(cierre < 0){

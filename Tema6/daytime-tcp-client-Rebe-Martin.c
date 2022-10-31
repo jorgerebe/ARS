@@ -41,7 +41,7 @@ int main(int argc, char* argv[]){
    }
 
 
-   /**
+   /*
     *	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
     *	comprobando que las opciones utilizadas son correctas (solo opcion -p)
     *
@@ -98,9 +98,8 @@ int main(int argc, char* argv[]){
    printf("Socket binded\n");
 #endif
 
-   /**
-    *	Se busca la direccion IP y el numero de puerto de protocolo del servidor con el que se desea
-    *	realizar la comunicacion. S
+   /*
+    *	Se busca la direccion IP y el numero de puerto de protocolo del servidor con el que se desea realizar la comunicacion.
     */
 
    /**
@@ -113,10 +112,10 @@ int main(int argc, char* argv[]){
    struct sockaddr_in addr_server;
    struct servent* info_servidor;
 
-   /**
+   /*
     *	Convertimos la cadena que contiene la IP en un numero de 32 bits en network byte order, y
     *	lo guarda en una estructura in_addr
-   **/
+    */
 
    if(inet_aton(ip, &ipServer) == 0){
       fprintf(stderr, "Invalid address\n");
@@ -167,7 +166,7 @@ int main(int argc, char* argv[]){
 
 
    /**
-    *	Se envia un datagrama con una cadena arbitraria al puerto y servidor correspondiente
+    *	Establecimiento de la conexion de circuito virtual con el servidor
     */
 
    int conexion = connect(sockfd, (struct sockaddr*)&addr_server, sizeof(addr_server));
@@ -188,7 +187,7 @@ int main(int argc, char* argv[]){
     *	Se recibe la respuesta del servidor y se imprime por pantalla
     */
 
-   int respuesta =recv(sockfd, buf, BUF_SIZE, 0);
+  int respuesta = recv(sockfd, buf, BUF_SIZE, 0);
 
   if(respuesta == -1){
      perror("recv()");
@@ -198,9 +197,12 @@ int main(int argc, char* argv[]){
    printf("%s", buf);
 
    /*
-    *	Cierre del socket UDP
+    *	Cierre del socket TCP
     */
-   shutdown(sockfd, SHUT_RDWR);
+
+
+  shutdown(sockfd, SHUT_RDWR);
+  recv(sockfd, buf, BUF_SIZE, 0);
    
   int cierre = close(sockfd);
 

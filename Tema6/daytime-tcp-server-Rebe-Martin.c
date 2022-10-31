@@ -19,7 +19,7 @@
 
 #include <netdb.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define BUF_SIZE 50
 #define MAX_CONEXIONES 5
@@ -31,6 +31,11 @@ void signal_handler();
 int sockfd;
 
 int main(int argc, char* argv[]){
+
+   /*
+    * Registro de la funcion de captura de signal SIGINT
+    *
+    */
 
    signal(SIGINT, *signal_handler);
 
@@ -155,10 +160,12 @@ int main(int argc, char* argv[]){
        */
 
 
-#if debug
-      printf("Esperando datagrama\n");
+#if DEBUG
+      printf("Esperando conexion\n");
       fflush(stdout);
 #endif
+
+
 
       socket_conexion = accept(sockfd, (struct sockaddr*)&addr_sender, &sizeAddress);
 
@@ -173,26 +180,42 @@ int main(int argc, char* argv[]){
          continue;
       }
       else{
-	 char* buf;
-	 buf = (char *)malloc(BUF_SIZE*sizeof(char));
-	 buf[0] = '\0';
-	 strcat(buf, hostname);
+	      char* buf;
+	      buf = (char *)malloc(BUF_SIZE*sizeof(char));
+	      buf[0] = '\0';
+	      strcat(buf, hostname);
 
          FILE *fich;
          int envio;
 
+       /*
+        *   Se obtiene la fecha y la hora utilizando al funcion system,
+        *   ejecutando el comando shell 'date' y redirigiendo su salida
+        *   a un fichero que se encontrara en la direccion /tmp/tt.txt,
+        *   sobreescribiendolo si ya existiera.
+        *
+        *   Despues, se escribe el resultado en el buffer buf despues
+        *   del nombre del host
+        */
+
          system("date > /tmp/tt.txt");
-      	 fich = fopen("/tmp/tt.txt", "r");
-      	 if(fgets(buf+sizeHostname*sizeof(char), BUF_SIZE, fich) == NULL){
-             fprintf(stderr, "Error en system(), en fopen(), o en fget\n");
-             exit(EXIT_FAILURE);
-          }
-       fclose(fich);
+      	fich = fopen("/tmp/tt.txt", "r");
+      	if(fgets(buf+sizeHostname*sizeof(char), BUF_SIZE, fich) == NULL){
+            fprintf(stderr, "Error en system(), en fopen(), o en fget\n");
+            exit(EXIT_FAILURE);
+         }
+
+         fclose(fich);
 
 #if DEBUG
        printf("Envio a cliente: %s", buf);
        fflush(stdout);
 #endif
+
+      /*
+       * Se envia la respuesta al cliente. Si hay error en el envio, se reporta
+       * y se termina el programa
+       */
 
        envio = send(socket_conexion, buf, BUF_SIZE, 0);
 
@@ -201,40 +224,29 @@ int main(int argc, char* argv[]){
             exit(EXIT_FAILURE);
        }
 
-       shutdown(socket_conexion, SHUT_RDWR);
-       recv(socket_conexion, buf, BUF_SIZE, 0);
-       close(socket_conexion);
+      if(recv(socket_conexion, buf, BUF_SIZE, 0) < 0){
+	       perror("recv()");
+       };
 
-       free(buf);
+       if(shutdown(socket_conexion, SHUT_RDWR) < 0){
+	       perror("shutdown()");
+       }
+       
+       if(close(socket_conexion) < 0){
+	       perror("close()");
 
-       exit(0);
-      }
-
-      
-      /*
-       *   Se obtiene la fecha y la hora utilizando al funcion system,
-       *   ejecutando el comando shell 'date' y redirigiendo su salida
-       *   a un fichero que se encontrara en la direccion /tmp/tt.txt,
-       *   sobreescribiendolo si ya existiera.
-       *
-       *   Despues, se escribe el resultado en el buffer buf despues
-       *   del nombre del host
-       */
-     
-
-      /*
-       * Se envia la respuesta al cliente. Si hay error en el envio, se reporta
-       * y se termina el programa
-       */
-
-      
+       }
 
       /*
        * Se libera el espacio ocupado por el buffer
        * de la respuesta al cliente
        */
-   }
 
+       free(buf);
+       exit(EXIT_SUCCESS); 
+
+      }   
+   }
 }
 
 void salir(char* argv[]){
@@ -247,16 +259,17 @@ void signal_handler(){
    printf("Signal handler\n");
 #endif
 
-   //char bufferingo[BUF_SIZE];
+    char buffer_[BUF_SIZE];
    if(shutdown(sockfd, SHUT_RDWR) < 0){
 	   perror("shutdown()");
    }
    
-   /*if(recv(sockfd, bufferingo, BUF_SIZE, 0) == -1){
-	   perror("recv()");
-   }*/
+   if(recv(sockfd, buffer_, BUF_SIZE, 0) < 0){
+	   //perror("recv()");
+   }
+
    if(close(sockfd) < 0){
-	perror("close()");
+	   perror("close()");
    }
 
    exit(EXIT_SUCCESS);

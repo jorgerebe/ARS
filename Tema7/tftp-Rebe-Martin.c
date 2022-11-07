@@ -8,6 +8,8 @@
 
 #include <endian.h>
 
+#include <stdbool.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
@@ -15,7 +17,7 @@
 
 #include <netdb.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #define BUF_SIZE 50
 
@@ -34,7 +36,9 @@ int main(int argc, char* argv[]){
    bool verbose = false;
    uint16_t puerto;
 
+   int opt;
    char* ip;
+   int request;
 
    /*
     * 	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
@@ -55,17 +59,33 @@ int main(int argc, char* argv[]){
     */
 
 
-   while((opt = getopt(argc, argv, "rwv:")) != -1){
+   while((opt = getopt(argc, argv, "rwv")) != -1){
       switch(opt){
-         case 'p':
-            puerto_tmp = atoi(optarg);
-            puerto = htons(puerto_tmp);
+         case 'r':
+            file = argv[optind];
+            request = OPCODE_RRQ;
             break;
+         case 'w':
+            file = argv[optind];
+            request = OPCODE_WRQ;
+	    break;
+         case 'v':
+            verbose = true;
+	    break;
          default:
-            fprintf(stderr, "Usage: %s direccion.IP.servidor [-p puerto-servidor]\n", argv[0]);
+            fprintf(stderr, "Usage: %s ip-servidor {-r|-w} archivo [-v]\n", argv[0]);
             exit(EXIT_FAILURE);
       }
    }
+
+   ip = argv[optind];
+
+#if DEBUG
+   printf("IP: %s\n", ip);
+   printf("MODO: %d\n", request);
+   printf("ARCHIVO: %s\n", file);
+   printf("VERBOSE: %s\n", verbose?"true":"false");
+#endif
    
 
 
@@ -136,19 +156,16 @@ int main(int argc, char* argv[]){
     *	para ello getservbyname()
     */
 
-   if(puerto_tmp == -1){
+   info_servidor = getservbyname(NOMBRE_SERVICIO, NULL);
 
-      info_servidor = getservbyname(NOMBRE_SERVICIO, NULL);
-
-      if(info_servidor == NULL){
+   if(info_servidor == NULL){
 #if DEBUG
-         printf("Servicio no encontrado\n");
+      printf("Servicio no encontrado\n");
 #endif
-         exit(EXIT_FAILURE);
-      }
-
-      puerto = info_servidor->s_port;
+      exit(EXIT_FAILURE);
    }
+
+   puerto = info_servidor->s_port;
 
 #if DEBUG
    printf("Puerto:%hu\n", be16toh(puerto));

@@ -243,35 +243,9 @@ int main(int argc, char* argv[]){
    int respuesta;
    short block;
 
-   respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &sizeRespuesta);
-
-
-   a = bufRespuesta[0];
-   b = bufRespuesta[1];
-
-   short opcode_respuesta = (unsigned char)a/256 + (unsigned char)b%256;
-
-   switch(opcode_respuesta)
-   {
-      case OPCODE_DATA:
-         block = (unsigned char)bufRespuesta[2]/256 + (unsigned char)bufRespuesta[3]%256;
-         printf("%d\n", block);
-         fwrite(bufRespuesta+4, strlen(bufRespuesta+4), 1, file);
-         break;
-      case OPCODE_ERROR:
-         fprintf(stderr, "%s\n", bufRespuesta+4);
-         exit(EXIT_FAILURE);
-         break;
-      default:
-         break;
-   }
-
-   exit(EXIT_SUCCESS);
-
-   while(true){
+   do{
 
       respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &sizeRespuesta);
-
 
       a = bufRespuesta[0];
       b = bufRespuesta[1];
@@ -281,19 +255,45 @@ int main(int argc, char* argv[]){
       switch(opcode_respuesta)
       {
          case OPCODE_DATA:
-            exit(EXIT_SUCCESS);
+            block = (unsigned char)bufRespuesta[2]*256 + (unsigned char)bufRespuesta[3];
             break;
          case OPCODE_ERROR:
-            fprintf(stderr, "Algo fallo\n");
+            fprintf(stderr, "%s\n", bufRespuesta+4);
             exit(EXIT_FAILURE);
             break;
       }
-   }
 
-  if(respuesta == -1){
-     perror("recvfrom()");
-     exit(EXIT_FAILURE);
-   }
+      fwrite(bufRespuesta+4, strlen(bufRespuesta+4), 1, file);
+      char ACK[4];
+
+      a = (unsigned char)OPCODE_ACK/256;
+      b = (unsigned char)OPCODE_ACK%256;
+
+      ACK[0] = a;
+      ACK[1] = b;
+
+      a = (unsigned char)block/256;
+      b = (unsigned char)block%256;
+
+      ACK[2] = a;
+      ACK[3] = b;
+
+      int envio = sendto(sockfd, ACK, strlen(ACK), 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
+
+      if(envio == -1){
+         perror("sendto()");
+         exit(EXIT_FAILURE);
+      }
+
+      if(respuesta == -1){
+         perror("recvfrom()");
+         exit(EXIT_FAILURE);
+      }
+      
+
+   } while(strlen(bufRespuesta+4) == 512);
+
+  
    
    printf("Datos recibidos: %s", bufRespuesta+3);
 

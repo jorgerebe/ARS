@@ -20,19 +20,21 @@
 
 #define DEBUG 1
 
-#define BUF_SIZE 128
+#define BUF_SIZE 516
 
-#define OPCODE_RRQ  1
-#define OPCODE_WRQ  2
-#define OPCODE_DATA 3
-#define OPCODE_ACK  4
+#define OPCODE_RRQ   1
+#define OPCODE_WRQ   2
+#define OPCODE_DATA  3
+#define OPCODE_ACK   4
+#define OPCODE_ERROR 5
 
 #define NOMBRE_SERVICIO "tftp"
 #define MODO "octet"
 
 int main(int argc, char* argv[]){
 
-   char* file;
+   FILE* file;
+   char* fileName;
 
    bool verbose = false;
    uint16_t puerto;
@@ -64,11 +66,11 @@ int main(int argc, char* argv[]){
    while((opt = getopt(argc, argv, "rwv")) != -1){
       switch(opt){
          case 'r':
-            file = argv[optind];
+            fileName = argv[optind];
             opcode = OPCODE_RRQ;
             break;
          case 'w':
-            file = argv[optind];
+            fileName = argv[optind];
             opcode = OPCODE_WRQ;
 	    break;
          case 'v':
@@ -80,12 +82,14 @@ int main(int argc, char* argv[]){
       }
    }
 
+   file = fopen(fileName, "w");
+
    ip = argv[optind];
 
 #if DEBUG
    printf("IP: %s\n", ip);
-   printf("MODO: %d\n", request);
-   printf("ARCHIVO: %s\n", file);
+   //printf("MODO: %d\n", request);
+   printf("ARCHIVO: %s\n", fileName);
    printf("VERBOSE: %s\n", verbose?"true":"false");
 #endif
 
@@ -196,16 +200,18 @@ int main(int argc, char* argv[]){
 
    request = (char*)malloc(BUF_SIZE*sizeof(char));
    *request = '\0';
-   request[0] = opcode;
-   short int other = request[0];
-   printf("%hu\n", other);
-   strcpy(request+2, file);
-   strcpy(request+2+strlen(file)+1, MODO);
-   //printf("%s\n", request+2+strlen(file)+1);
-   //printf("%s\n%d\n", request, strlen(request));
-   //fflush(stdout);
-   //free(request);
-   //exit(EXIT_SUCCESS);
+
+   char a = (unsigned char)opcode/256;
+   char b = (unsigned char)opcode%256;
+
+   request[0] = a;
+   request[1] = b;
+
+   //char c = request[0];
+   //char d = request[1];
+
+   strcpy(request+2, fileName);
+   strcpy(request+2+strlen(fileName)+1, MODO);
 
 
 
@@ -220,8 +226,8 @@ int main(int argc, char* argv[]){
       exit(EXIT_FAILURE);
    }
 
-#if debug
-   printf("Datagram sent. Size: %d\n", envio);
+#if DEBUG
+   printf("Datagram sent. Size: %s\n", request+2);
    fflush(stdout);
 #endif
 
@@ -232,17 +238,64 @@ int main(int argc, char* argv[]){
     */
 
    socklen_t sizeRespuesta = 0;
+   char* bufRespuesta = (char*)malloc(BUF_SIZE*sizeof(char));
 
-   char buf[BUF_SIZE];
+   int respuesta;
+   short block;
 
-   int respuesta =recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &sizeRespuesta);
+   respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &sizeRespuesta);
+
+
+   a = bufRespuesta[0];
+   b = bufRespuesta[1];
+
+   short opcode_respuesta = (unsigned char)a/256 + (unsigned char)b%256;
+
+   switch(opcode_respuesta)
+   {
+      case OPCODE_DATA:
+         block = (unsigned char)bufRespuesta[2]/256 + (unsigned char)bufRespuesta[3]%256;
+         printf("%d\n", block);
+         fwrite(bufRespuesta+4, strlen(bufRespuesta+4), 1, file);
+         break;
+      case OPCODE_ERROR:
+         fprintf(stderr, "%s\n", bufRespuesta+4);
+         exit(EXIT_FAILURE);
+         break;
+      default:
+         break;
+   }
+
+   exit(EXIT_SUCCESS);
+
+   while(true){
+
+      respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &sizeRespuesta);
+
+
+      a = bufRespuesta[0];
+      b = bufRespuesta[1];
+
+      short opcode_respuesta = (unsigned char)a/256 + (unsigned char)b%256;
+
+      switch(opcode_respuesta)
+      {
+         case OPCODE_DATA:
+            exit(EXIT_SUCCESS);
+            break;
+         case OPCODE_ERROR:
+            fprintf(stderr, "Algo fallo\n");
+            exit(EXIT_FAILURE);
+            break;
+      }
+   }
 
   if(respuesta == -1){
      perror("recvfrom()");
      exit(EXIT_FAILURE);
    }
    
-   printf("%s", buf);
+   printf("Datos recibidos: %s", bufRespuesta+3);
 
    /*
     *	Cierre del socket UDP

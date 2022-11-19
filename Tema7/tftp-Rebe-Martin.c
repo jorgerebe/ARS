@@ -21,7 +21,7 @@
 #define DEBUG 0
 
 #define BUF_SIZE 516
-#define MAX_FILE_SIZE
+#define MAX_FILE_SIZE 100
 
 #define OPCODE_RRQ   1
 #define OPCODE_WRQ   2
@@ -32,16 +32,22 @@
 #define NOMBRE_SERVICIO "tftp"
 #define MODO "octet"
 
-void lectura();
-void escritura();
+void lectura(int sockfd, struct sockaddr_in addr_server, char* fileName, char ACK[], bool verbose);
+void escritura(int sockfd, struct sockaddr_in addr_server, char*fileName, bool verbose);
+void sendACK(int sockfd, struct sockaddr_in addr_server, char ACK[], short int block);
 
-bool verbose;
+char* fileName;
 
 int main(int argc, char* argv[]){
 
-   verbose = false;
-   FILE* file;
+   int sockfd;
+   bool verbose = false;
+   struct sockaddr_in addr_server;
    char* fileName;
+
+   char ACK[4];
+   ACK[0] = (unsigned char)OPCODE_ACK/256;
+   ACK[1] = (unsigned char)OPCODE_ACK%256;
 
    uint16_t puerto;
 
@@ -88,8 +94,6 @@ int main(int argc, char* argv[]){
       }
    }
 
-   file = fopen(fileName, "w");
-
    ip = argv[optind];
 
 #if DEBUG
@@ -104,7 +108,6 @@ int main(int argc, char* argv[]){
     *	Generacion del descriptor del socket UDP
     */
 
-   int sockfd;
    struct sockaddr_in myaddr;
 
 
@@ -147,7 +150,7 @@ int main(int argc, char* argv[]){
 
    ip = argv[optind];
    struct in_addr ipServer;
-   struct sockaddr_in addr_server;
+  
    struct servent* info_servidor;
 
    /**
@@ -201,20 +204,13 @@ int main(int argc, char* argv[]){
 
    /*
     * Se crea la solicitud para el servidor
-    *
     */
 
    request = (char*)malloc(BUF_SIZE*sizeof(char));
    *request = '\0';
 
-   char a = (unsigned char)opcode/256;
-   char b = (unsigned char)opcode%256;
-
-   request[0] = a;
-   request[1] = b;
-
-   //char c = request[0];
-   //char d = request[1];
+   request[0] = (unsigned char)(opcode/256);
+   request[1] = (unsigned char)(opcode%256);
 
    strcpy(request+2, fileName);
    strcpy(request+2+strlen(fileName)+1, MODO);
@@ -237,112 +233,24 @@ int main(int argc, char* argv[]){
    fflush(stdout);
 #endif
 
+   switch(opcode)
+   {
+      case OPCODE_RRQ:
+         lectura(sockfd, addr_server, fileName, ACK, verbose);
+         break;
+      case OPCODE_WRQ:
+         escritura(sockfd, addr_server, fileName, verbose);
+         break;
+   }
+
 
 
    /*
     *	Se recibe la respuesta del servidor y se imprime por pantalla
     */
 
-   socklen_t addrlen = 0;
+     
 
-   char* bufRespuesta = NULL;
-   char ACK[4];
-   bufRespuesta = (char*)malloc(BUF_SIZE*sizeof(char));
-
-   int respuesta;
-   short int opcode_respuesta;
-   short previousBlock = -1;
-   short block;
-
-   do{
-      free(bufRespuesta);
-      bufRespuesta = (char*)malloc(BUF_SIZE*sizeof(char));
-      *bufRespuesta = '\0';
-
-      respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &addrlen);
-
-      if(respuesta == -1){
-         perror("recvfrom()");
-         exit(EXIT_FAILURE);
-      }
-
-#if DEBUG
-      printf("Size respuesta:- %d\n", sizeRespuesta);
-#endif
-
-      a = bufRespuesta[0];
-      b = bufRespuesta[1];
-
-      opcode_respuesta = (unsigned char)a/256 + (unsigned char)b%256;
-      printf("%d\n", opcode_respuesta);
-
-      switch(opcode_respuesta)
-      {
-         case OPCODE_DATA:
-            block = (unsigned char)bufRespuesta[2]*256 + (unsigned char)bufRespuesta[3];
-            if(block == previousBlock){
-               a = (unsigned char)OPCODE_ACK/256;
-               b = (unsigned char)OPCODE_ACK%256;
-               ACK[0] = a;
-               ACK[1] = b;
-               a = (unsigned char)block/256;
-               b = (unsigned char)block%256;
-               
-               ACK[2] = a;
-               ACK[3] = b;
-               
-               envio = sendto(sockfd, ACK, 4, 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
-               continue;
-            }
-            break;
-         case OPCODE_ERROR:
-            fprintf(stderr, "%s\n", bufRespuesta+4);
-            exit(EXIT_FAILURE);
-            break;
-      }
-
-      previousBlock = block;
-
-      if(verbose){
-         printf("Recibido bloque del servidor tftp\n");
-         printf("Es el bloque con codigo %d\n", block);
-      }
-
-      fwrite(bufRespuesta+4, 1, respuesta-4, file);
-
-      a = (unsigned char)OPCODE_ACK/256;
-      b = (unsigned char)OPCODE_ACK%256;
-
-      ACK[0] = a;
-      ACK[1] = b;
-      
-
-      a = (unsigned char)block/256;
-      b = (unsigned char)block%256;
-
-      ACK[2] = a;
-      ACK[3] = b;
-
-      printf("%s", ACK);
-
-
-      printf("BLOQUE: %d", block);
-
-      /*printf("OPCODE: %d - BLOQUE: %d\n\n\n", ((unsigned char)ACK[0]*256 + (unsigned char)ACK[1]), ((unsigned char)ACK[2]*256 + (unsigned char)ACK[3]));*/
-
-      envio = sendto(sockfd, ACK, 4, 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
-
-      if(envio == -1){
-         perror("sendto()");
-         exit(EXIT_FAILURE);
-      }
-
-      printf("\nSize respuesta: %d\n", respuesta-4);
-            
-
-   } while((respuesta-4) == 512);
-
-   fclose(file); 
 
    /*
     *	Cierre del socket UDP
@@ -360,5 +268,144 @@ int main(int argc, char* argv[]){
    */
 
    exit(EXIT_SUCCESS);
+}
+
+void sendACK(int sockfd, struct sockaddr_in addr_server, char ACK[], short int block){
+
+   ACK[2] = (unsigned char)(block/256);
+   ACK[3] = (unsigned char)(block%256);
+#if DEBUG
+   printf ("ACK[0] es %d\n", ACK[0]);
+   printf ("ACK[1] es %d\n", ACK[1]);
+   printf ("ACK[2] es %d\n", ACK[2]);
+   printf ("ACK[3] es %d\n", ACK[3]);
+#endif
+   if(sendto(sockfd, ACK, 4, 0, (struct sockaddr*)&addr_server, sizeof(addr_server)) == -1){
+      perror("sendto()");
+      exit(EXIT_FAILURE);
+   }
+}
+
+
+void lectura(int sockfd, struct sockaddr_in addr_server, char* fileName, char ACK[], bool verbose){
+
+   FILE* file = fopen(fileName, "w");
+
+   socklen_t addrlen = sizeof(struct sockaddr);
+
+   char* bufRespuesta = NULL;
+   bufRespuesta = (char*)malloc(BUF_SIZE*sizeof(char));
+
+   int respuesta;
+   short int opcode_respuesta;
+   short block = -1;
+
+ do{
+      free(bufRespuesta);
+      bufRespuesta = (char*)malloc(BUF_SIZE*sizeof(char));
+      *bufRespuesta = '\0';
+
+      respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &addrlen);
+
+      if(respuesta == -1){
+         perror("recvfrom()");
+         exit(EXIT_FAILURE);
+      }
+
+#if DEBUG
+      printf("Size respuesta:- %d\n", respuesta-4);
+#endif
+
+      opcode_respuesta = (unsigned char)bufRespuesta[0]*256 + (unsigned char)bufRespuesta[1];
+      printf("OPCODE: %d\n", opcode_respuesta);
+
+      switch(opcode_respuesta)
+      {
+         case OPCODE_DATA:
+            block = (unsigned char)bufRespuesta[2]*256 + (unsigned char)bufRespuesta[3];
+   	    printf ("RESPUESTA[2]: %d\tRESPUESTA[3]: %d\n", (unsigned char)bufRespuesta[2], (unsigned char)bufRespuesta[3]);
+            break;
+         case OPCODE_ERROR:
+            fprintf(stderr, "%s\n", bufRespuesta+4);
+            exit(EXIT_FAILURE);
+      }
+
+      if(verbose){
+         printf("Recibido bloque del servidor tftp\n");
+         printf("Es el bloque con codigo %d\n", block);
+      }
+
+      fwrite(bufRespuesta+4, 1, respuesta-4, file);
+
+      sendACK(sockfd, addr_server, ACK, block);
+
+      printf("\nSize respuesta: %d\n", respuesta-4);
+            
+   } while((respuesta-4) == 512);
+
+   fclose(file); 
+}
+
+void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool verbose){
+   
+   FILE* file = fopen(fileName, "r");
+
+   socklen_t addr_len = sizeof(struct sockaddr);
+
+   char bufRespuesta[BUF_SIZE];
+
+   char* bufEnvio;
+
+   int bytesSent = -1;
+
+   int respuesta;
+   short int opcode_respuesta;
+   short block = 0;
+   short blockACK = -1;
+
+   while(true){
+      bufEnvio = (char*)malloc(BUF_SIZE*sizeof(char));
+
+      respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &addr_len);
+
+      if(respuesta == -1){
+         perror("recvfrom()");
+         exit(EXIT_FAILURE);
+      }
+
+      opcode_respuesta = (unsigned char)bufRespuesta[0]*256 + (unsigned char)bufRespuesta[1];
+
+      switch(opcode_respuesta)
+      {
+         case OPCODE_ACK:
+            blockACK = (unsigned char)bufRespuesta[2]*256 + (unsigned char)bufRespuesta[3];
+            if(blockACK == block){
+               if((bytesSent > -1) && (bytesSent < 512)){
+                  fclose(file);
+                  return;
+               }
+               block++;
+            }
+            break;
+         case OPCODE_ERROR:
+            fprintf(stderr, "%s\n", bufRespuesta+4);
+            exit(EXIT_FAILURE);
+      }
+
+      bufEnvio[0] = (unsigned char)(OPCODE_DATA/256);
+      bufEnvio[1] = (unsigned char)(OPCODE_DATA%256);
+      bufEnvio[2] = (unsigned char)(block/256);
+      bufEnvio[3] = (unsigned char)(block%256);
+
+      bytesSent = fread(bufEnvio+4, 1, 512, file);
+      if(sendto(sockfd, bufEnvio, bytesSent+4, 0, (struct sockaddr*)&addr_server, sizeof(addr_server)) == -1){
+         perror("sendto()");
+         exit(EXIT_FAILURE);
+      }
+
+      free(bufEnvio);
+
+
+   }
 
 }

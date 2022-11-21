@@ -127,7 +127,7 @@ int main(int argc, char* argv[]){
 
 
    /*
-    *	Generacion del descriptor del socket UDP
+    *   Generacion del descriptor del socket UDP
     */
 
    struct sockaddr_in myaddr;
@@ -280,7 +280,7 @@ int main(int argc, char* argv[]){
 
 
    /*
-    *	Cierre del socket UDP
+    * Cierre del socket UDP
     */
 
   int cierre = close(sockfd);
@@ -573,7 +573,7 @@ void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool 
             }
 
             if(blockACK == block){
-               if((bytesSent > -1) && (bytesSent < 512)){
+               if((bytesSent > -1) && (bytesSent < BUF_SIZE - 4)){
                   if(verbose){
                      printf("El bloque %d era el ultimo: cerramos el fichero.\n", block);
                   }
@@ -604,7 +604,7 @@ void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool 
        * retorna la funcion fread (lee el fichero y pone la cantidad de bytes especificada en el buffer de envio)
        */
 
-      bytesSent = fread(bufEnvio+4, 1, 512, file);
+      bytesSent = fread(bufEnvio+4, 1, BUF_SIZE - 4, file);
       if(sendto(sockfd, bufEnvio, bytesSent+4, 0, (struct sockaddr*)&addr_server, sizeof(addr_server)) == -1){
          perror("sendto()");
          exit(EXIT_FAILURE);

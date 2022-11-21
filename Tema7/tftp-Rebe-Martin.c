@@ -21,7 +21,7 @@
 #define DEBUG 0
 
 #define BUF_SIZE 516
-#define MAX_FILE_SIZE 100
+#define MAX_FILE_NAME 100
 
 #define OPCODE_RRQ   1
 #define OPCODE_WRQ   2
@@ -34,9 +34,7 @@
 
 void lectura(int sockfd, struct sockaddr_in addr_server, char* fileName, char ACK[], bool verbose);
 void escritura(int sockfd, struct sockaddr_in addr_server, char*fileName, bool verbose);
-void sendACK(int sockfd, struct sockaddr_in addr_server, char ACK[], short int block);
-
-char* fileName;
+void sendACK(int sockfd, struct sockaddr_in addr_server, char ACK[], short int block, bool verbose);
 
 int main(int argc, char* argv[]){
 
@@ -44,6 +42,11 @@ int main(int argc, char* argv[]){
    bool verbose = false;
    struct sockaddr_in addr_server;
    char* fileName;
+
+   /*
+    * Buffer donde se enviaran los ACKS. Siempre los dos primeros bytes
+    * son iguales, por lo que se establecen ahora (el numero de operacion correspondiente al ACK)
+    */
 
    char ACK[4];
    ACK[0] = (unsigned char)OPCODE_ACK/256;
@@ -69,7 +72,7 @@ int main(int argc, char* argv[]){
 
    /**
     *	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
-    *	comprobando que las opciones utilizadas son correctas (solo opcion -p)
+    *	comprobando que las opciones utilizadas son correctas (opcion -r -w y -v)
     *
     *	Si se utiliza alguna otra, se muestra el error y se sale.
     */
@@ -79,10 +82,29 @@ int main(int argc, char* argv[]){
       switch(opt){
          case 'r':
             fileName = argv[optind];
+	         if(strlen(fileName) > MAX_FILE_NAME){
+               fprintf(stderr, "El nombre del fichero no puede ser superior a 100 caracteres");
+               exit(EXIT_FAILURE);
+	         }
             opcode = OPCODE_RRQ;
             break;
          case 'w':
             fileName = argv[optind];
+
+            /*
+            * Se abre el fichero especificado para lectura
+            */
+   
+            FILE* file = fopen(fileName, "r");
+
+            if(file == NULL){
+               fprintf(stderr, "El fichero que se quiere escribir no existe\n");
+               exit(EXIT_FAILURE);
+               fclose(file);
+            }
+
+            fclose(file);
+
             opcode = OPCODE_WRQ;
 	    break;
          case 'v':
@@ -138,12 +160,12 @@ int main(int argc, char* argv[]){
    printf("Socket binded\n");
 #endif
 
-   /**
+   /*
     *	Se busca la direccion IP y el numero de puerto de protocolo del servidor con el que se desea
-    *	realizar la comunicacion. S
+    *	realizar la comunicacion.
     */
 
-   /**
+   /*
     * 	En primer lugar, se obtiene la direccion ip del argumento al que apunta argv[optind] [getopt(3)]
     * 	optind es el indice en argv del primer elemento de ese vector que no es una opcion
     */
@@ -153,10 +175,10 @@ int main(int argc, char* argv[]){
   
    struct servent* info_servidor;
 
-   /**
+   /*
     *	Convertimos la cadena que contiene la IP en un numero de 32 bits en network byte order, y
     *	lo guarda en una estructura in_addr
-   **/
+    */
 
    if(inet_aton(ip, &ipServer) == 0){
       fprintf(stderr, "Invalid address\n");
@@ -165,8 +187,7 @@ int main(int argc, char* argv[]){
 
 
    /*
-    *	Si no se ha especificado puerto, se busca el correspondiente
-    *	al servicio que se va a utilizar, en este caso, daytime; utilizando
+    *	Se busca el puerto correspondiente al servicio que se va a utilizar, en este caso, tftp; utilizando
     *	para ello getservbyname()
     */
 
@@ -217,7 +238,7 @@ int main(int argc, char* argv[]){
 
 
 
-   /**
+   /*
     *	Se envia un datagrama con una cadena arbitraria al puerto y servidor correspondiente
     */
 
@@ -227,6 +248,17 @@ int main(int argc, char* argv[]){
       perror("sendto()");
       exit(EXIT_FAILURE);
    }
+
+
+   if(verbose){
+      if(opcode == OPCODE_RRQ){
+         printf("Enviada solicitud de lectura de %s a servidor %s en %s.\n", fileName, NOMBRE_SERVICIO, ip);
+      }
+      else if(opcode == OPCODE_WRQ){
+         printf("Enviada solicitud de escritura de %s a servidor %s en %s.\n", fileName, NOMBRE_SERVICIO, ip);
+      }
+   }
+
 
 #if DEBUG
    printf("Datagram sent. Size: %s\n", request+2);
@@ -241,15 +273,10 @@ int main(int argc, char* argv[]){
       case OPCODE_WRQ:
          escritura(sockfd, addr_server, fileName, verbose);
          break;
+      default:
+         fprintf(stderr, "Usage: %s ip-servidor {-r|-w} archivo [-v]\n", argv[0]);
+         exit(EXIT_FAILURE);
    }
-
-
-
-   /*
-    *	Se recibe la respuesta del servidor y se imprime por pantalla
-    */
-
-     
 
 
    /*
@@ -264,13 +291,17 @@ int main(int argc, char* argv[]){
   }
 
   /*
-   *	Finalizacion del cliente
+   *	Finalizacion del cliente con exito
    */
 
    exit(EXIT_SUCCESS);
 }
 
-void sendACK(int sockfd, struct sockaddr_in addr_server, char ACK[], short int block){
+void sendACK(int sockfd, struct sockaddr_in addr_server, char ACK[], short int block, bool verbose){
+
+   /*
+    * Se pone el numero de bloque correspondiente en los bytes 2 y 3 del ACK
+    */
 
    ACK[2] = (unsigned char)(block/256);
    ACK[3] = (unsigned char)(block%256);
@@ -280,30 +311,65 @@ void sendACK(int sockfd, struct sockaddr_in addr_server, char ACK[], short int b
    printf ("ACK[2] es %d\n", ACK[2]);
    printf ("ACK[3] es %d\n", ACK[3]);
 #endif
+
+   /*
+    * Se envia el ACK al servidor
+    *
+    */
+
    if(sendto(sockfd, ACK, 4, 0, (struct sockaddr*)&addr_server, sizeof(addr_server)) == -1){
       perror("sendto()");
       exit(EXIT_FAILURE);
+   }
+
+   /*
+    * Se imprime la informacion sobre el ACK enviado si se ha solicitado
+    */
+
+   if(verbose){
+      printf("Enviamos el ACK del bloque %d.\n", block);
    }
 }
 
 
 void lectura(int sockfd, struct sockaddr_in addr_server, char* fileName, char ACK[], bool verbose){
 
+   /*
+    * Se abre el fichero especificado para escritura
+    */
+
    FILE* file = fopen(fileName, "w");
+
+   if(file == NULL){
+      perror("fopen()");
+      exit(EXIT_FAILURE);
+   }
+
+
+   /*
+    * Se inicializa la variable del size de la estructura de datos del servidor
+    */
 
    socklen_t addrlen = sizeof(struct sockaddr);
 
-   char* bufRespuesta = NULL;
-   bufRespuesta = (char*)malloc(BUF_SIZE*sizeof(char));
+   char* bufRespuesta;
 
    int respuesta;
    short int opcode_respuesta;
-   short block = -1;
+   short int prevBlock = -1;
+   short int block = -1;
 
  do{
-      free(bufRespuesta);
+      /*
+       * Se asigna espacio al bufer en el que recibiremos la informacion
+       */  
+
       bufRespuesta = (char*)malloc(BUF_SIZE*sizeof(char));
       *bufRespuesta = '\0';
+
+      /*
+       * Se reciben los datos del servidor
+       */
 
       respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &addrlen);
 
@@ -312,43 +378,134 @@ void lectura(int sockfd, struct sockaddr_in addr_server, char* fileName, char AC
          exit(EXIT_FAILURE);
       }
 
-#if DEBUG
-      printf("Size respuesta:- %d\n", respuesta-4);
-#endif
+      if(verbose){
+         printf("Recibido bloque del servidor %s.\n", NOMBRE_SERVICIO);
+      }
+
+      /*
+       * Se recupera el codigo de respuesta del datagrama recibido
+       */
 
       opcode_respuesta = (unsigned char)bufRespuesta[0]*256 + (unsigned char)bufRespuesta[1];
+
+#if DEBUG
+      printf("Size respuesta: %d\n", respuesta-4);
       printf("OPCODE: %d\n", opcode_respuesta);
+      fflush(stdout);
+#endif
+
+
+      /*
+       * Se comprueba el tipo de datagrama recibido y se actua segun ello
+       */
 
       switch(opcode_respuesta)
       {
+
+         /*
+          * Si se recibe un datagrama data, se recupera numero de bloque recibido
+          */
+
          case OPCODE_DATA:
             block = (unsigned char)bufRespuesta[2]*256 + (unsigned char)bufRespuesta[3];
-   	    printf ("RESPUESTA[2]: %d\tRESPUESTA[3]: %d\n", (unsigned char)bufRespuesta[2], (unsigned char)bufRespuesta[3]);
+
+            /*
+             * Comprobacion de que los paquetes se estan recibiendo en el orden correcto
+             */
+
+            if(prevBlock != -1){
+               if(prevBlock + 1 != block){
+                  sendACK(sockfd, addr_server, ACK, block, verbose);
+                  continue;
+               }
+
+            }
+
+            prevBlock = block;
+#if DEBUG
+   	      printf ("RESPUESTA[2]: %d\tRESPUESTA[3]: %d\n", (unsigned char)bufRespuesta[2], (unsigned char)bufRespuesta[3]);
+            fflush(stdout);
+#endif
             break;
+            /*
+             * Si se recibe un datagrama error, se imprime el error recibido y se sale del programa
+             */
          case OPCODE_ERROR:
-            fprintf(stderr, "%s\n", bufRespuesta+4);
+            fclose(file);
+            short int errcode = (unsigned char)bufRespuesta[2]*256 + (unsigned char)bufRespuesta[3];
+            fprintf(stderr, "errcode: %d\t%s\n", errcode, bufRespuesta+4);
+            exit(EXIT_FAILURE);
+
+            /*
+             * Si no es un datagrama de data ni error, se sale del programa
+             */
+
+         default:
+            fprintf(stderr, "Recibido un datagrama inesperado.\n");
             exit(EXIT_FAILURE);
       }
 
+      /*
+       * Si se ha solicitado, se imprimen los datos del bloque recibido
+       */
+
       if(verbose){
-         printf("Recibido bloque del servidor tftp\n");
-         printf("Es el bloque con codigo %d\n", block);
+         printf("Es el bloque con codigo %d.\n", block);
       }
+
+      /*
+       * Si el datagrama recibido es data, se escriben los datos recibidos en el fichero
+       * con el nombre especificado, utilizando la funcion fwrite
+       */
 
       fwrite(bufRespuesta+4, 1, respuesta-4, file);
 
-      sendACK(sockfd, addr_server, ACK, block);
+      /*
+       * Tras esto, se envia el ACK correspondiente al servidor
+       */
 
-      printf("\nSize respuesta: %d\n", respuesta-4);
+      sendACK(sockfd, addr_server, ACK, block, verbose);
+
+      free(bufRespuesta);
+
+      /*
+       * Se comprueba la condicion de salida del bucle: si se han recibido menos de 512 bytes de datos,
+       * entonces la lectura del fichero ha concluido y se sale del bucle de lectura.
+       */
             
    } while((respuesta-4) == 512);
+
+   /*
+    * Si se ha solicitado, se imprime los datos del ultimo bloque recibido
+    */
+
+   if(verbose){
+      printf("El bloque %d era el ultimo: cerramos el fichero.\n", block);
+   }
+
+   /*
+    * Se cierra el fichero
+    */
 
    fclose(file); 
 }
 
 void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool verbose){
-   
+
+   /*
+    * Se abre el fichero para lectura con el nombre especificado.
+    */
+
    FILE* file = fopen(fileName, "r");
+
+   if(file == NULL){
+      perror("fopen()");
+      exit(EXIT_FAILURE);
+   }
+
+   /*
+    * Se inicializa la variable del size de la estructura de datos del servidor
+    */
 
    socklen_t addr_len = sizeof(struct sockaddr);
 
@@ -363,8 +520,22 @@ void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool 
    short block = 0;
    short blockACK = -1;
 
+
+   /*
+    * Bucle de escritura de fichero al servidor
+    */
+
    while(true){
+
+      /*
+       * Se asigna espacio al buffer de envio de datos
+       */
+
       bufEnvio = (char*)malloc(BUF_SIZE*sizeof(char));
+
+      /*
+       * Se espera la respuesta del ACK del servidor
+       */
 
       respuesta = recvfrom(sockfd, bufRespuesta, BUF_SIZE, 0, (struct sockaddr*)&addr_server, &addr_len);
 
@@ -372,15 +543,41 @@ void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool 
          perror("recvfrom()");
          exit(EXIT_FAILURE);
       }
+      
+      
+      /*
+       * Se recoge el codigo de operacion de la respuesta del servidor
+       */
 
       opcode_respuesta = (unsigned char)bufRespuesta[0]*256 + (unsigned char)bufRespuesta[1];
 
       switch(opcode_respuesta)
       {
+         /*
+          * Si se ha recibido un ACK, se comprueba el numero de bloque. Si es el mismo al enviado
+          * en el anterior envio, se comprueba el numero de bytes enviados en dicho envio.
+          * Si es mayor que -1 (es decir, se ha enviado ya al menos un bloque) y menor de
+          * 512 (es el ultimo envio), entonces se cierra el fichero y retornamos.
+          *
+          * Sino, si se ha recibido el ACK con el mismo bloque que el envio anterior, incrementamos el
+          * numero de bloque. Sino, si no se ha recibido el ACK con el mismo bloque que el
+          * envio anterior, se envia de nuevo el bloque anterior. 
+          */
+
          case OPCODE_ACK:
+
             blockACK = (unsigned char)bufRespuesta[2]*256 + (unsigned char)bufRespuesta[3];
+
+            if(verbose){
+               printf("Recibido el ACK del bloque %d del servidor %s.\n", blockACK, NOMBRE_SERVICIO);
+            }
+
             if(blockACK == block){
                if((bytesSent > -1) && (bytesSent < 512)){
+                  if(verbose){
+                     printf("El bloque %d era el ultimo: cerramos el fichero.\n", block);
+                  }
+                  free(bufEnvio);
                   fclose(file);
                   return;
                }
@@ -392,10 +589,20 @@ void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool 
             exit(EXIT_FAILURE);
       }
 
+      /*
+       * Se preparan los 4 primeros bytes del envio del datagrama data,
+       * los 2 primeros para el codigo de operacion y los 2 segundos para el numero de bloque
+       */
+
       bufEnvio[0] = (unsigned char)(OPCODE_DATA/256);
       bufEnvio[1] = (unsigned char)(OPCODE_DATA%256);
       bufEnvio[2] = (unsigned char)(block/256);
       bufEnvio[3] = (unsigned char)(block%256);
+
+      /*
+       * Se recogen el numero de bytes que se van a enviar en bytesSent, que es el valor que
+       * retorna la funcion fread (lee el fichero y pone la cantidad de bytes especificada en el buffer de envio)
+       */
 
       bytesSent = fread(bufEnvio+4, 1, 512, file);
       if(sendto(sockfd, bufEnvio, bytesSent+4, 0, (struct sockaddr*)&addr_server, sizeof(addr_server)) == -1){
@@ -403,9 +610,16 @@ void escritura(int sockfd, struct sockaddr_in addr_server, char* fileName, bool 
          exit(EXIT_FAILURE);
       }
 
+      /*
+       * Si se ha solicitado, imprimimos la informacion del bloque de datos enviado.
+       */
+
+      if(verbose){
+         printf("Enviamos el bloque con codigo %d, de %d bytes.\n", block, bytesSent);
+      }
+
       free(bufEnvio);
 
-
    }
-
 }
+

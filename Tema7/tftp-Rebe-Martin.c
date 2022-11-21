@@ -473,7 +473,7 @@ void lectura(int sockfd, struct sockaddr_in addr_server, char* fileName, char AC
        * entonces la lectura del fichero ha concluido y se sale del bucle de lectura.
        */
             
-   } while((respuesta-4) == 512);
+   } while(respuesta == BUF_SIZE);
 
    /*
     * Si se ha solicitado, se imprime los datos del ultimo bloque recibido

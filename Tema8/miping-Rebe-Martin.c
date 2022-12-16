@@ -19,11 +19,12 @@
 
 #include <netdb.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #define BUF_SIZE 128
-#define PAYLOAD "Este es el payload"
+#define PAYLOAD "Este es el payload."
 
+unsigned short int getChecksum(ECHORequest echoRequest);
 void mensaje(char* cadena);
 
 int main(int argc, char* argv[]){
@@ -34,7 +35,6 @@ int main(int argc, char* argv[]){
 
    int opt;
    char* ip;
-   char* request;
 
    /*
     * 	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
@@ -70,8 +70,6 @@ int main(int argc, char* argv[]){
 
 #if DEBUG
    printf("IP: %s\n", ip);
-   printf("MODO: %d\n", opcode);
-   printf("ARCHIVO: %s\n", fileName);
    printf("VERBOSE: %s\n", verbose?"true":"false");
 #endif
 
@@ -156,42 +154,30 @@ int main(int argc, char* argv[]){
    ECHORequest echoRequest;
    ICMPHeader icmpHeader;
 
+
+
+   /*for(i = 0; i < strlen(echoRequest.payload); i++){
+      echoRequest.payload[i] = 0;
+   }*/
+
    icmpHeader.Type = 8;
    icmpHeader.Code = 0;
    icmpHeader.Checksum = 0;
    echoRequest.icmpHeader = icmpHeader;
-   echoRequest.ID = 1000;//getpid();
+   echoRequest.ID = getpid();
    echoRequest.SeqNumber = 0;
-   strncpy(echoRequest.payload, PAYLOAD, strlen(PAYLOAD));
+   strncpy(echoRequest.payload, PAYLOAD, 64);
 
-   int numShorts = sizeof(echoRequest)/2;
-   unsigned short int *puntero;
-   unsigned int acumulador = 0;
+   unsigned short int checksum = getChecksum(echoRequest);
 
-   puntero = (unsigned short int *)&echoRequest;
+   echoRequest.icmpHeader.Checksum = checksum;
 
-   int i;
-
-   for(i = 0; i < numShorts; i++){
-      printf("Dir: %p\n", puntero);
-      acumulador = acumulador + (unsigned int) *puntero;
-      printf("%d - %d\n", i, *puntero);
-      puntero++;
+   if(getChecksum(echoRequest) != 0){
+      fprintf(stderr, "Error al calcular el checksum");
+      exit(EXIT_FAILURE);
    }
 
-   acumulador = (acumulador >> 16) + (acumulador & 0x0000ffff);
-   acumulador = (acumulador >> 16) + (acumulador & 0x0000ffff);
-
-   printf("Acumulador: %hu\n", acumulador);
-
-   return 0;
-
-
-   /*
-    *	Se envia un datagrama con una cadena arbitraria al puerto y servidor correspondiente
-    */
-
-   int envio = sendto(sockfd, request, BUF_SIZE, 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
+   int envio = sendto(sockfd, &echoRequest, sizeof(echoRequest), 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
 
    if(envio == -1){
       perror("sendto()");
@@ -199,14 +185,19 @@ int main(int argc, char* argv[]){
    }
 
 
-   if(verbose){
-   }
-
-
 #if DEBUG
-   printf("Datagram sent. Size: %s\n", request+2);
+   printf("Datagram sent. Size: %ld\n", sizeof(echoRequest));
    fflush(stdout);
 #endif
+
+   int respuesta = recvfrom(sockfd, echoResponse, sizeof(echoResponse), 0, (struct sockaddr*)&addr_server, &addrlen);
+
+   if(respuesta == -1){
+      perror("recvfrom()");
+      exit(EXIT_FAILURE);
+   }
+
+   printf("Respuesta recibida desde %s\n");
 
 
 
@@ -227,6 +218,42 @@ int main(int argc, char* argv[]){
 
    exit(EXIT_SUCCESS);
 }
+
+
+unsigned short int getChecksum(ECHORequest echoRequest){
+
+   int numShorts = sizeof(echoRequest)/2;
+
+#if DEBUG
+   printf("Num shorts: %d\n", numShorts);
+   fflush(stdout);
+#endif
+
+   unsigned short int *puntero;
+   unsigned int acumulador = 0;
+   int i = 0;
+
+   puntero = (unsigned short int *)&echoRequest;
+
+   for(i = 0; i < numShorts; i++){
+      acumulador = acumulador + (unsigned int) *puntero;
+      puntero++;
+   }
+
+
+   acumulador = (acumulador >> 16) + (acumulador & 0x0000ffff);
+   acumulador = (acumulador >> 16) + (acumulador & 0x0000ffff);
+   acumulador = ~acumulador;
+
+#if DEBUG
+   printf("Checksum: %x\n", (short int)acumulador);
+   fflush(stdout);
+#endif
+
+   return (unsigned short int) acumulador;
+
+}
+
 
 void mensaje(char* cadena){
    printf("->%s.\n", cadena);

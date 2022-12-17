@@ -21,7 +21,9 @@
 
 #define DEBUG 0
 
-#define BUF_SIZE 128
+#define PAYLOAD_SIZE 64
+#define TYPE_PING 8
+#define CODE_PING 0
 #define PAYLOAD "Este es el payload."
 
 unsigned short int getChecksum(ECHORequest echoRequest);
@@ -48,7 +50,7 @@ int main(int argc, char* argv[]){
 
    /**
     *	Comprobacion de que la llamada al programa se ha realizado de manera correcta,
-    *	comprobando que las opciones utilizadas son correctas (opcion -r -w y -v)
+    *	comprobando que las opciones utilizadas son correctas (opcion -v)
     *
     *	Si se utiliza alguna otra, se muestra el error y se sale.
     */
@@ -74,7 +76,7 @@ int main(int argc, char* argv[]){
 
 
    /*
-    *   Generacion del descriptor del socket UDP
+    *   Generacion del descriptor del socket RAW
     */
 
    struct sockaddr_in myaddr;
@@ -153,19 +155,13 @@ int main(int argc, char* argv[]){
    ECHORequest echoRequest;
    ICMPHeader icmpHeader;
 
-
-
-   /*for(i = 0; i < strlen(echoRequest.payload); i++){
-      echoRequest.payload[i] = 0;
-   }*/
-
-   icmpHeader.Type = 8;
-   icmpHeader.Code = 0;
+   icmpHeader.Type = TYPE_PING;
+   icmpHeader.Code = CODE_PING;
    icmpHeader.Checksum = 0;
    echoRequest.icmpHeader = icmpHeader;
    echoRequest.ID = getpid();
    echoRequest.SeqNumber = 0;
-   strncpy(echoRequest.payload, PAYLOAD, 64);
+   strncpy(echoRequest.payload, PAYLOAD, PAYLOAD_SIZE);
 
    unsigned short int checksum = getChecksum(echoRequest);
 
@@ -180,11 +176,11 @@ int main(int argc, char* argv[]){
       printf("-> Generando cabecera ICMP.\n");
       printf("-> Type: %d\n", echoRequest.icmpHeader.Type);
       printf("-> Code: %d\n", echoRequest.icmpHeader.Code);
-      printf("-> Identifier (pid): %d\n", echoRequest.ID);
+      printf("-> Identifier (pid): %d.\n", echoRequest.ID);
       printf("-> Seq. number: %d\n", echoRequest.SeqNumber);
       printf("-> Cadena a enviar: %s\n", echoRequest.payload);
-      printf("-> Checksum: 0x%x\n", echoRequest.icmpHeader.Checksum);
-      printf("-> Tamano total del paquete ICMP: %ld\n", sizeof(echoRequest));
+      printf("-> Checksum: 0x%x.\n", echoRequest.icmpHeader.Checksum);
+      printf("-> Tamano total del paquete ICMP: %ld.\n", sizeof(echoRequest));
    }
 
    int envio = sendto(sockfd, &echoRequest, sizeof(echoRequest), 0, (struct sockaddr*)&addr_server, sizeof(addr_server));
@@ -218,7 +214,7 @@ int main(int argc, char* argv[]){
       printf("-> Tamano de la respuesta: %ld\n", sizeof(echoResponse));
       printf("-> Cadena recibida: %s\n", echoResponse.payload);
       printf("-> Identifier (pid): %d\n", echoResponse.ID);
-      printf("-> TTL: %d\n", echoResponse.ipHeader.TTL);
+      printf("-> TTL: %d\n", (unsigned short int)echoResponse.ipHeader.TTL);
    }
 
    short int type = echoResponse.icmpHeader.Type;
@@ -228,25 +224,80 @@ int main(int argc, char* argv[]){
    printf("Descripcion de la respuesta: ");
 
    if(type == 0 && code == 0){
-      printf("respuesta correcta (type %d, code %d)\n", type, code);
+      printf("respuesta correcta ");
    }
    else{
       switch(type)
       {
          case 3:
-            printf("Destination unreachable");
+            printf("Destination unreachable: ");
             switch(code)
             {
                case 0:
-                  printf("Destination network unreachable");
+                  printf("Destination network unreachable ");
                   break;
                case 1:
-
-
+		            printf("Destination host unreachable ");
+		            break;
+               case 2:
+                  printf("Destination protocol unreachable ");
+                  break;
+               case 3:
+                  printf("Destination port unreachable ");
+                  break;
+               case 9:
+                  printf("Network administratively prohibited ");
+                  break;
+               case 10:
+                  printf("Host administratively prohibited ");
+                  break;
+               case 11:
+                  printf("Network unreachable for ToS ");
+                  break;
+               case 12:
+                  printf("Host unreachable for ToS ");
+                  break;
+               case 13:
+                  printf("Communication administratively prohibited ");
+                  break;
+            }
+            break;
+         case 5:
+            printf("Redirect Message: ");
+            switch(code)
+            {
+               case 0:
+                  printf("Redirect Datagram for the Network");
+                  break;
+               case 1:
+                  printf("Redirect Datagram for the Host");
+                  break;
+               case 2:
+                  printf("Redirect Datafram for the ToS & network");
+                  break;
+               case 3:
+                  printf("Redirect Datagram for the ToS & host ");
+                  break;
+            }
+            break;
+         case 8:
+            printf("Echo Request: Echo request (used to ping) ");
+            break;
+         case 11:
+            switch(code)
+            {
+               case 0:
+                  printf("TTL expired in transit ");
+                  break;
+               case 1:
+                  printf("Fragment reassembly time exceeded ");
+                  break;
             }
             break;
       }
    }
+
+   printf("(type %d, code %d)\n", type, code);
 
 
    /*
